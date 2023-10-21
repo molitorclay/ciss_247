@@ -4,14 +4,14 @@
 # Description: 
 	assemble: Takes an input file name and an output filename.
         The input file must be SISA assembly.
-        The output file will be the input converted to bytecode.
+        The output file will be the input converted to bytecode 
+            stored as ASCII '0's and '1's. 
     write_operator_code: Writes leading opcodes to file.
         Opcode passed as string is written as binary opcode to the output file.
     write_register_code: Included by prof.
         Register passed as string is written as binary register to the output file.
     write_binary_number: Writes a binary number to file.
         Binary passed as string is written to the output file.
-
 */
 
 #pragma warning(disable : 4996)
@@ -52,8 +52,9 @@ void assemble(char *assemblyFilename, char *objectCodeFilename)
 
         printf("Translating assembly statement: %s\n", file_line);
 
-        //Chunks are opcode mnemonic, registers, or binary numbers.
+        //Chunks are opcode mnemonics, registers, or binary numbers.
         char *chunk; 
+        // Read opcode mnemonic
         chunk = strtok(file_line, PADDING_CHARACTERS);
         write_operator_code(chunk, fptr_write);
 
