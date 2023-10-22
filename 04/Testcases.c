@@ -56,11 +56,15 @@ void TestAssemblerInstruction(char* testCaseName, char* assemblyFilename, char* 
 
     if (test_case_result == 0)
     {
+        printf("\033[1;32m"); //green
         printf("Test case result: PASSED\n\n");
+        printf("\033[0m\n"); // white
     }
     else
     {
+        printf("\033[1;31m"); //red
         printf("Test case result: FAILED\n\n");
+        printf("\033[0m\n"); // white
     }
 
     printf("*************************END ASSEMBLY PROCESS*************************\n\n");
