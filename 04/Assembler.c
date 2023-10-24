@@ -2,7 +2,7 @@
 # Name: Clay Molitor
 # Date: 10/23/2023
 # Description: 
-
+    My program transforms a SISA assembly file into machine code binary.
 */
 
 #pragma warning(disable : 4996)
@@ -15,9 +15,9 @@
 #include "RegisterSet.h"
 #include "InstructionOpcodes.h"
 
-void write_opcode(       char* reg_num,   unsigned short* machineInstruction, unsigned short leftShift);
-void write_register_code(char* reg_num,   unsigned short* machineInstruction, unsigned short leftShift);
-void write_immediate(    char* immediate, unsigned short* machineInstruction, unsigned short leftShift);
+void write_opcode(       char* reg_num,   unsigned short* machineInstruction, unsigned short* leftShift);
+void write_register_code(char* reg_num,   unsigned short* machineInstruction, unsigned short* leftShift);
+void write_immediate(    char* immediate, unsigned short* machineInstruction, unsigned short* leftShift);
 void write_machine_instruction(FILE* fptr_write, unsigned short machineInstruction);
 
 const char *PADDING_CHARACTERS = ", []+\0";
@@ -36,64 +36,39 @@ void assemble(char* assemblyFilename, char* objectCodeFilename)
 
     while (result != 0)
     {
-        // machineInstruction is populated with the 16 bit binary
-        //      conversion of the current assembly line.
+        // machineInstruction receives a line of assemble converted into 16 bits of binary.
         unsigned short machineInstruction = 0;
-        unsigned short shift = 16;
-        //Chunk is current opcode mnemonic, register, or binary number.
-        char *chunk; 
+        unsigned short shift = sizeof(machineInstruction) * 8;
 
         // Set end of line chars to null in current line.
         file_line[strcspn(file_line, "\r")] = 0; // Linux
         file_line[strcspn(file_line, "\n")] = 0; // Windows
 
         printf("Translating assembly statement: %s\n", file_line);
-
-
         
-        // Read opcode mnemonic
-        chunk = strtok(file_line, PADDING_CHARACTERS);
-        
-        //chunk = strtok(NULL, PADDING_CHARACTERS);
-        // For entire line of assembly
-        while(chunk != NULL)
+        // Read each word in line of assembly. output to machineInstruction.
+        for(char* chunk = strtok(file_line, PADDING_CHARACTERS); 
+            chunk != NULL; 
+            chunk = strtok(NULL, PADDING_CHARACTERS))
         {
-            
-            if(chunk[0] == 'R') // If register
-            {
-                shift -= 4;
-                write_register_code(chunk, &machineInstruction, shift);
+            if(chunk[0] == 'R' && (chunk[1] >= '0' && chunk[1] <= '9' )) // If register
+            {  
+                write_register_code(chunk, &machineInstruction, &shift);
             }
             else if(chunk[0] == 'b') // If binary number
             {
-                // trim 'b' off front.
                 char* trimmed_immediate = strtok(chunk, "b");
-                shift -= strlen(trimmed_immediate);
 
-                write_immediate(trimmed_immediate, &machineInstruction, shift);
+                write_immediate(trimmed_immediate, &machineInstruction, &shift);
             }
             else // Opcode 
             {
-                shift -= 4;
-                
-                write_opcode(chunk, &machineInstruction, shift);
-
-                // Add 4 bits padding after B operation
-                if (strcmp(chunk, B) == 0) {
-                    
-                    shift -= 4;
-                } 
-                // Add 12 bits padding after HALT operation
-                else if (strcmp(chunk, HALT) == 0) {
-                    //shift -= 12;
-                }
+                write_opcode(chunk, &machineInstruction, &shift);
             }
-            // Get next chunk
-            chunk = strtok(NULL, PADDING_CHARACTERS);
-        } // End While 
+        } // End for loop
+
 
         write_machine_instruction(fptr_write, machineInstruction);
-
 
         // Read next line.
         result = fgets(file_line, ASSEMBLY_STATEMENT_BUFFER_SIZE, fptr_read);
@@ -103,10 +78,17 @@ void assemble(char* assemblyFilename, char* objectCodeFilename)
     fclose(fptr_write);
 }
 
-void write_opcode(char* opcode, unsigned short* machineInstruction, unsigned short leftShift)
+// opcode is ASCII. See InstructionOpcodes.h for valid inputs.
+// machineInstruction is combined with, opcode binary offset by leftShift.
+// leftShift points to the start of where data should be written to machineInstruction.
+// leftShift is then set to the address of remaining unwritten space in machineInstruction.
+void write_opcode(char* opcode, unsigned short* machineInstruction, unsigned short* leftShift)
 {
     unsigned short machineOpcode = 0;
-
+    // Opcodes are 4 bits long, move shift to accommodate. 
+    *leftShift -= 4;
+    // Used for indexing machineInstruction.
+    int startShift = *leftShift;
 
     // Convert Ascii assembly to matching binary instruction.
     if        (strcmp(opcode, MOVI) == 0) {
@@ -138,58 +120,69 @@ void write_opcode(char* opcode, unsigned short* machineInstruction, unsigned sho
     } else if (strcmp(opcode, BGE)  == 0) {
         machineOpcode = OPCODE_BGE;
     } else if (strcmp(opcode, B)    == 0) {
-        machineOpcode = OPCODE_B;
-        //fprintf(fptr_write, MCIA_PADDING;
+        machineOpcode = OPCODE_B; 
+        *leftShift -= 4; // 4 bit padding after opcode.
     } else if (strcmp(opcode, HALT) == 0) {
         machineOpcode = OPCODE_HALT;
-        //fprintf(fptr_write, MCIA_PADDING;
-        //fprintf(fptr_write, MCIA_PADDING;
-        //fprintf(fptr_write, MCIA_PADDING;
+        *leftShift -= 12; // 12 bit padding after opcode.
     } else {
         // invalid operator
-        printf("Invalid Operator: %s", opcode);
+        printf("\n\tInvalid Operator: %s \n", opcode);
     }
 
-    machineOpcode = machineOpcode << leftShift;
+    machineOpcode = machineOpcode << startShift;
     *machineInstruction = *machineInstruction | machineOpcode;
 }
 
-void write_register_code(char* reg_num, unsigned short* machineInstruction, unsigned short leftShift)
+// reg_num is ASCII. See RegisterSet.h for valid inputs.
+// machineInstruction is combined with, opcode binary offset by leftShift.
+// leftShift points to the start of where data should be written to machineInstruction.
+// leftShift is then set to the address of remaining unwritten space in machineInstruction.
+void write_register_code(char* reg_num, unsigned short* machineInstruction, unsigned short* leftShift)
 {
     unsigned short machineRegister = 0;
+    // Register are 4 bits or longer, move shift to accommodate.
+    *leftShift -= 4;
 
+    // Convert Ascii registers to matching binary equivalent.
     if        (strcmp(reg_num, ACRO_R0) == 0) {
         machineRegister = MCRO_R0;
-    } else if (strcmp(reg_num, ACRO_R1) == 0){
-        machineRegister = MCRO_R1;
-    } else if (strcmp(reg_num, ACRO_R2) == 0){
-        machineRegister = MCRO_R2;
-    } else if (strcmp(reg_num, ACRO_R3) == 0){
-        machineRegister = MCRO_R3;
-    } else if (strcmp(reg_num, ACRO_R4) == 0){
-        machineRegister = MCRO_R4;
-    } else if (strcmp(reg_num, ACRO_R5) == 0){
-        machineRegister = MCRO_R5;
-    } else if (strcmp(reg_num, ACRO_R6) == 0){
-        machineRegister = MCRO_R6;
-    } else if (strcmp(reg_num, ACRO_R7) == 0){
-        machineRegister = MCRO_R7;
-    } else if (strcmp(reg_num, ACRO_R8) == 0){
+    } else if (strcmp(reg_num, ACRO_R1) == 0) {
+        machineRegister = MCRO_R1; 
+    } else if (strcmp(reg_num, ACRO_R2) == 0) {
+        machineRegister = MCRO_R2; 
+    } else if (strcmp(reg_num, ACRO_R3) == 0) {
+        machineRegister = MCRO_R3; 
+    } else if (strcmp(reg_num, ACRO_R4) == 0) {
+        machineRegister = MCRO_R4; 
+    } else if (strcmp(reg_num, ACRO_R5) == 0) {
+        machineRegister = MCRO_R5; 
+    } else if (strcmp(reg_num, ACRO_R6) == 0) {
+        machineRegister = MCRO_R6; 
+    } else if (strcmp(reg_num, ACRO_R7) == 0) {
+        machineRegister = MCRO_R7; 
+    } else if (strcmp(reg_num, ACRO_R8) == 0) {
         machineRegister = MCRO_R8;
     } else {
         // Invalid register.
-        printf("Invalid register: %s", reg_num);
+        printf("\n\tInvalid register: %s\n", reg_num);
     }
 
-    machineRegister = machineRegister << leftShift;
+    machineRegister = machineRegister << *leftShift;
     *machineInstruction = *machineInstruction | machineRegister;
 }
 
-// Remove 'b' before passing
-void write_immediate(char* immediate, unsigned short* machineInstruction, unsigned short leftShift)
+// immediate is a binary number in ASCII of 4 or 8 bits. Remove 'b' before passing.
+// machineInstruction is combined with opcode binary.
+// leftShift points to the start of where data should be written to machineInstruction.
+// leftShift is then set to the address of remaining unwritten space in machineInstruction.
+void write_immediate(char* immediate, unsigned short* machineInstruction, unsigned short* leftShift)
 {
+    // immediate should be 4 or 8 chars
+    *leftShift -= strlen(immediate);
+
     unsigned short machineImmediate = (unsigned short)strtol(immediate, NULL, 2);;
-    machineImmediate = machineImmediate << leftShift;
+    machineImmediate = machineImmediate << *leftShift;
     *machineInstruction = *machineInstruction | machineImmediate;
 }
 
