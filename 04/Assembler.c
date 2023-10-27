@@ -32,13 +32,14 @@ void assemble(char* assemblyFilename, char* objectCodeFilename)
     fptr_read = fopen(assemblyFilename, "r");
     fptr_write = fopen(objectCodeFilename, "wb");
 
-    char* result = fgets(file_line, ASSEMBLY_STATEMENT_BUFFER_SIZE, fptr_read);
-
-    while (result != 0)
+    // for each line in assemblyFilename file.
+    for (char* result = fgets(file_line, ASSEMBLY_STATEMENT_BUFFER_SIZE, fptr_read);
+        result != 0;
+        result = fgets(file_line, ASSEMBLY_STATEMENT_BUFFER_SIZE, fptr_read))
     {
         // machineInstruction receives a line of assemble converted into 16 bits of binary.
         unsigned short machineInstruction = 0;
-        unsigned short shift = sizeof(machineInstruction) * 8;
+        unsigned short shift = sizeof(machineInstruction) * 8; // 16
 
         // Set end of line chars to null in current line.
         file_line[strcspn(file_line, "\r")] = 0; // Linux
@@ -46,7 +47,7 @@ void assemble(char* assemblyFilename, char* objectCodeFilename)
 
         printf("Translating assembly statement: %s\n", file_line);
         
-        // Read each word in line of assembly. output to machineInstruction.
+        // Read each segment in line of assembly. output to machineInstruction.
         for(char* chunk = strtok(file_line, PADDING_CHARACTERS); 
             chunk != NULL; 
             chunk = strtok(NULL, PADDING_CHARACTERS))
@@ -55,10 +56,9 @@ void assemble(char* assemblyFilename, char* objectCodeFilename)
             {  
                 write_register_code(chunk, &machineInstruction, &shift);
             }
-            else if(chunk[0] == 'b') // If binary number
+            else if(chunk[0] == 'b') // If binary number aka immediate. 
             {
                 char* trimmed_immediate = strtok(chunk, "b");
-
                 write_immediate(trimmed_immediate, &machineInstruction, &shift);
             }
             else // Opcode 
@@ -67,19 +67,15 @@ void assemble(char* assemblyFilename, char* objectCodeFilename)
             }
         } // End for loop
 
-
         write_machine_instruction(fptr_write, machineInstruction);
-
-        // Read next line.
-        result = fgets(file_line, ASSEMBLY_STATEMENT_BUFFER_SIZE, fptr_read);
+        
     }
-
     fclose(fptr_read);
     fclose(fptr_write);
 }
 
 // opcode is ASCII. See InstructionOpcodes.h for valid inputs.
-// machineInstruction is combined with, opcode binary offset by leftShift.
+// machineInstruction is added with the offset opcode binary.
 // leftShift points to the start of where data should be written to machineInstruction.
 // leftShift is then set to the address of remaining unwritten space in machineInstruction.
 void write_opcode(char* opcode, unsigned short* machineInstruction, unsigned short* leftShift)
@@ -135,7 +131,7 @@ void write_opcode(char* opcode, unsigned short* machineInstruction, unsigned sho
 }
 
 // reg_num is ASCII. See RegisterSet.h for valid inputs.
-// machineInstruction is combined with, opcode binary offset by leftShift.
+// machineInstruction is added with the offset opcode binary.
 // leftShift points to the start of where data should be written to machineInstruction.
 // leftShift is then set to the address of remaining unwritten space in machineInstruction.
 void write_register_code(char* reg_num, unsigned short* machineInstruction, unsigned short* leftShift)
@@ -173,7 +169,7 @@ void write_register_code(char* reg_num, unsigned short* machineInstruction, unsi
 }
 
 // immediate is a binary number in ASCII of 4 or 8 bits. Remove 'b' before passing.
-// machineInstruction is combined with opcode binary.
+// machineInstruction is added to the offset opcode binary.
 // leftShift points to the start of where data should be written to machineInstruction.
 // leftShift is then set to the address of remaining unwritten space in machineInstruction.
 void write_immediate(char* immediate, unsigned short* machineInstruction, unsigned short* leftShift)
